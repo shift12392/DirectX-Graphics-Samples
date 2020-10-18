@@ -125,7 +125,7 @@ private:
 	ComPtr<ID3D12RootSignature> CreateMissSignature();
 	ComPtr<ID3D12RootSignature> CreateHitSignature();
 
-	void CreateShaderResource();
+	void CreateRTXShaderResource();
 	void CreateRaytracingPipeline();
 	void CreateGraphicsPipelineState();
 

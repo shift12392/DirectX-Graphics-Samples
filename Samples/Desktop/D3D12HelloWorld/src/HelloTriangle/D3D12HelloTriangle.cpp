@@ -32,12 +32,12 @@ void D3D12HelloTriangle::OnInit()
 ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateRayGenSignature()
 {
 	CD3DX12_ROOT_PARAMETER1 rootParameter[1];
-	CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2];
+	CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1];
 
 	descriptorRange[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-	descriptorRange[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE, 1 );
+	//descriptorRange[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE, 1 );
 
-	rootParameter[0].InitAsDescriptorTable(2, descriptorRange);
+	rootParameter[0].InitAsDescriptorTable(1, descriptorRange);
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
 	desc.Init_1_1(1, rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
@@ -58,7 +58,7 @@ ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateHitSignature()
 	return SerializeRootSignature(desc);
 }
 
-void D3D12HelloTriangle::CreateShaderResource()
+void D3D12HelloTriangle::CreateRTXShaderResource()
 {
 	//与光栅化不同，光线跟踪过程不会直接写入渲染目标：而是将结果写入到作为无序访问视图（UAV）绑定的缓冲区中，然后将其复制到渲染目标进行显示。
     //另外，任何调用TraceRay（）的着色器程序都必须能够访问顶级加速结构（TLAS）。
@@ -86,17 +86,17 @@ void D3D12HelloTriangle::CreateShaderResource()
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	desc.NumDescriptors = 2;
+	desc.NumDescriptors = 3;
 	ThrowIfFailed( m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_rtxHeap)));
 
+	//第一个描述符表示场景数据
 	D3D12_CPU_DESCRIPTOR_HANDLE handle = m_rtxHeap->GetCPUDescriptorHandleForHeapStart();
-
+	D3D12_CONSTANT_BUFFER_VIEW_DESC constantBufferViewDesc = {};
+	constantBufferViewDesc.BufferLocation = m_sceneDataGPUBuffer.m_resource->GetGPUVirtualAddress();
+	constantBufferViewDesc.SizeInBytes = m_sceneDataGPUBuffer.m_bufferSize;
+	m_device->CreateConstantBufferView(&constantBufferViewDesc,handle);
 	
-	D3D12_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
-	viewDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	m_device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &viewDesc, handle);
-
-
+	//第二个描述符表示加速结构
 	handle.ptr += m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
 	SRVDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -104,6 +104,12 @@ void D3D12HelloTriangle::CreateShaderResource()
 	SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	SRVDesc.RaytracingAccelerationStructure.Location = m_topDestAccelerationStructureData->GetGPUVirtualAddress();
 	m_device->CreateShaderResourceView(nullptr, &SRVDesc, handle);
+
+	//第三个描述符表示光线追踪渲染的最终纹理
+	handle.ptr += m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
+	viewDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	m_device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &viewDesc, handle);
 }
 
 void D3D12HelloTriangle::CreateRaytracingPipeline()
@@ -199,10 +205,9 @@ void D3D12HelloTriangle::CreateShaderBindingTable()
 
 	// The pointer to the beginning of the heap is the only parameter required by
 	// shaders without root parameters
-	D3D12_GPU_DESCRIPTOR_HANDLE srvUavHeapHandle =
-		m_rtxHeap->GetGPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE GenHeapHandle = m_rtxHeap->GetGPUDescriptorHandleForHeapStart();
 
-	auto heapPointer = reinterpret_cast<UINT64*>(srvUavHeapHandle.ptr);
+	auto heapPointer = reinterpret_cast<UINT64*>(GenHeapHandle.ptr + 2 * m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 
 	// The ray generation only uses heap data
 	m_sbtHelper.AddRayGenerationProgram(L"RayGen", { heapPointer });
@@ -375,7 +380,7 @@ void D3D12HelloTriangle::LoadAssets()
 	//创建根签名
 	CreateRootSignature();
 
-	CreateShaderResource();
+	CreateRTXShaderResource();
 
 	//创建光栅化PSO
 	CreateGraphicsPipelineState();
@@ -419,7 +424,10 @@ void D3D12HelloTriangle::CreateRootSignature()
 	//创建光线追踪全局根签名
 	{
 		CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-		rootParameters[0].InitAsConstantBufferView(0, 0);
+		CD3DX12_DESCRIPTOR_RANGE1 DescriptorRange[2];
+		DescriptorRange[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+		DescriptorRange[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,1,0,0,D3D12_DESCRIPTOR_RANGE_FLAG_NONE,1);
+		rootParameters[0].InitAsDescriptorTable(2, DescriptorRange);
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters);    //D3D12_ROOT_SIGNATURE_FLAG_NONE默认是全局跟签名
@@ -711,7 +719,8 @@ void D3D12HelloTriangle::PopulateCommandList()
 		m_commandList->SetDescriptorHeaps(1, heap);
 
 		m_commandList->SetComputeRootSignature(m_rtxGlobalRootSignature.Get());
-		m_commandList->SetComputeRootConstantBufferView(0, m_sceneDataGPUBuffer.m_resource->GetGPUVirtualAddress());
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = m_rtxHeap->GetGPUDescriptorHandleForHeapStart();
+		m_commandList->SetComputeRootDescriptorTable(0, handle);
 
 		m_commandList->RSSetViewports(1, &m_viewport);
 		m_commandList->RSSetScissorRects(1, &m_scissorRect);

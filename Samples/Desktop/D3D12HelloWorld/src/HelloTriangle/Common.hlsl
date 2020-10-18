@@ -20,3 +20,6 @@ cbuffer SceneData : register(b0)
 {
 	float4 g_ambientColor;
 };
+
+// Raytracing acceleration structure, accessed as a SRV
+RaytracingAccelerationStructure SceneBVH : register(t0);

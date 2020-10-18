@@ -3,9 +3,6 @@
 // Raytracing output texture, accessed as a UAV
 RWTexture2D< float4 > gOutput : register(u0);
 
-// Raytracing acceleration structure, accessed as a SRV
-RaytracingAccelerationStructure SceneBVH : register(t0);
-
 [shader("raygeneration")] 
 void RayGen() {
   // Initialize the ray payload
@@ -20,8 +17,8 @@ void RayGen() {
 
   // Define a ray, consisting of origin, direction, and the min-max distance values
   RayDesc ray;
-  ray.Origin = float3(d.x, -d.y, 1);
-  ray.Direction = float3(0, 0, -1);
+  ray.Origin = float3(d.x, -d.y, -1);      //再观察空间摄像机朝向z轴观察，这里改了光线的方向。
+  ray.Direction = float3(0, 0, 1);
   ray.TMin = 0;
   ray.TMax = 100000;
 
