@@ -9,6 +9,11 @@
 //
 //*********************************************************
 
+cbuffer SceneData : register(b0)
+{
+	float4  g_ambientColor;
+};
+
 struct PSInput
 {
     float4 position : SV_POSITION;
@@ -27,5 +32,5 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    return input.color;
+    return g_ambientColor;
 }

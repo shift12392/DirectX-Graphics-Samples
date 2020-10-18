@@ -18,6 +18,11 @@
 // referenced by the GPU.
 using Microsoft::WRL::ComPtr;
 
+#ifndef ROUND_UP
+#define ROUND_UP(v, powerOf2Alignment)                                         \
+  ( ((v) + (powerOf2Alignment)-1) & ~((powerOf2Alignment)-1))
+#endif
+
 inline std::string HrToString(HRESULT hr)
 {
     char s_str[64] = {};
@@ -140,6 +145,12 @@ inline UINT CalculateConstantBufferByteSize(UINT byteSize)
     return (byteSize + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
 }
 
+inline UINT64 CalculateConstantBufferByteSize(UINT64 byteSize)
+{
+	// Constant buffer size is required to be aligned.
+	return (byteSize + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
+}
+
 #ifdef D3D_COMPILE_STANDARD_FILE_INCLUDE
 inline Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
     const std::wstring& filename,
@@ -189,3 +200,59 @@ void ResetUniquePtrArray(T* uniquePtrArray)
         i.reset();
     }
 }
+
+inline ID3D12Resource* CreateUploadBuffer(ID3D12Device5 *InDevice,
+	UINT64 InBufferSize,
+	D3D12_RESOURCE_STATES InResourceState = D3D12_RESOURCE_STATE_COMMON,
+	D3D12_RESOURCE_FLAGS InResourceFlag = D3D12_RESOURCE_FLAG_NONE)
+{
+	ID3D12Resource *resource = nullptr;
+
+	ThrowIfFailed(InDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, InResourceFlag), InResourceState, nullptr, IID_PPV_ARGS(&resource)));
+
+	return resource;
+}
+
+inline ID3D12Resource* CreateDefaultBuffer(ID3D12Device5 *InDevice,
+	UINT64 InBufferSize,
+	D3D12_RESOURCE_STATES InResourceState = D3D12_RESOURCE_STATE_COMMON,
+	D3D12_RESOURCE_FLAGS InResourceFlag = D3D12_RESOURCE_FLAG_NONE)
+{
+	ID3D12Resource *resource = nullptr;
+
+	ThrowIfFailed(InDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT,0,0), D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, InResourceFlag), InResourceState, nullptr, IID_PPV_ARGS(&resource)));
+
+	return resource;
+}
+
+template<typename T>
+class StructUploadBuffer
+{
+public:
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
+	UINT64 m_bufferSize = 0;
+	T *m_data = nullptr;
+
+	~StructUploadBuffer()
+	{
+		if (m_data != nullptr)
+		{
+			m_resource->Unmap(0, nullptr);
+			m_data = nullptr;
+		}
+	}
+
+	void CreateBuffer(ID3D12Device5 *InDevice)
+	{
+		m_bufferSize = CalculateConstantBufferByteSize(sizeof(T));
+		m_resource = CreateUploadBuffer(InDevice, m_bufferSize, D3D12_RESOURCE_STATE_GENERIC_READ);
+		ThrowIfFailed( m_resource->Map(0, nullptr, reinterpret_cast<void**>(&m_data)) );
+	}
+
+	void CopyDataToGPU(const T& InData)
+	{
+		memcpy(m_data, &InData, m_bufferSize);
+	}
+};
