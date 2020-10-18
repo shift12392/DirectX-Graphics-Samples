@@ -161,6 +161,7 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), { L"RayGen" });
 	pipeline.AddRootSignatureAssociation(m_missSignature.Get(), { L"Miss" });
 	pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), { L"HitGroup" });
+	pipeline.SetGlobalRootSignature(m_rtxGlobalRootSignature);                        
 
 	// The payload size defines the maximum size of the data carried by the rays,
 	// ie. the the data
@@ -415,7 +416,16 @@ void D3D12HelloTriangle::CreateRootSignature()
 	}
 
 
-	//创建光线追踪根签名
+	//创建光线追踪全局根签名
+	{
+		CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+		rootParameters[0].InitAsConstantBufferView(0, 0);
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters);    //D3D12_ROOT_SIGNATURE_FLAG_NONE默认是全局跟签名
+
+		m_rtxGlobalRootSignature = SerializeRootSignature(rootSignatureDesc);
+	}
 }
 
 void D3D12HelloTriangle::CreateGraphicsPipelineState()
@@ -699,6 +709,9 @@ void D3D12HelloTriangle::PopulateCommandList()
 
 		ID3D12DescriptorHeap* heap[] = { m_rtxHeap.Get() };
 		m_commandList->SetDescriptorHeaps(1, heap);
+
+		m_commandList->SetComputeRootSignature(m_rtxGlobalRootSignature.Get());
+		m_commandList->SetComputeRootConstantBufferView(0, m_sceneDataGPUBuffer.m_resource->GetGPUVirtualAddress());
 
 		m_commandList->RSSetViewports(1, &m_viewport);
 		m_commandList->RSSetScissorRects(1, &m_scissorRect);

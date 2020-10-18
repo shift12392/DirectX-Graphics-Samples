@@ -14,3 +14,9 @@ struct Attributes
 {
   float2 bary;
 };
+
+
+cbuffer SceneData : register(b0)
+{
+	float4 g_ambientColor;
+};

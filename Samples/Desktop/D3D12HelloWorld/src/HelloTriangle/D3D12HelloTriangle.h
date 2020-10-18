@@ -67,6 +67,7 @@ private:
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rasterizationRootSignature;
+	ComPtr<ID3D12RootSignature> m_rtxGlobalRootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList4> m_commandList;
