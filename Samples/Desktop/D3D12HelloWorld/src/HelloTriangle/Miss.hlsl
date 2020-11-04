@@ -3,5 +3,5 @@
 [shader("miss")]
 void Miss(inout HitInfo payload : SV_RayPayload)
 {
-    payload.colorAndDistance = float4(0.2f, 0.2f, 0.8f, -1.f);
+    payload.colorAndDistance = float4(1.0f, 0.0f, 0.0f, -1.f);
 }

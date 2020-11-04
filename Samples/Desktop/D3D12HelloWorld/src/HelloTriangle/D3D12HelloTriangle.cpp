@@ -13,6 +13,7 @@
 #include "D3D12HelloTriangle.h"
 #include "nv_helpers_dx12/RaytracingPipelineGenerator.h"
 #include "DXRHelper.h"
+#include <dxgidebug.h>
 
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) :
     DXSample(width, height, name),
@@ -53,8 +54,13 @@ ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateMissSignature()
 
 ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateHitSignature()
 {
+	CD3DX12_ROOT_PARAMETER1 rootParameter[2];
+
+	rootParameter[0].InitAsShaderResourceView(1, 0);
+	rootParameter[1].InitAsShaderResourceView(2, 0);
+
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
-	desc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+	desc.Init_1_1(_countof(rootParameter), rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 	return SerializeRootSignature(desc);
 }
 
@@ -92,8 +98,8 @@ void D3D12HelloTriangle::CreateRTXShaderResource()
 	//第一个描述符表示场景数据
 	D3D12_CPU_DESCRIPTOR_HANDLE handle = m_rtxHeap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_CONSTANT_BUFFER_VIEW_DESC constantBufferViewDesc = {};
-	constantBufferViewDesc.BufferLocation = m_sceneDataGPUBuffer.m_resource->GetGPUVirtualAddress();
-	constantBufferViewDesc.SizeInBytes = m_sceneDataGPUBuffer.m_bufferSize;
+	constantBufferViewDesc.BufferLocation = m_scene->m_scenetBuffer.GetGpuVirtualAddress();
+	constantBufferViewDesc.SizeInBytes = m_scene->m_scenetBuffer.GetBufferSize();
 	m_device->CreateConstantBufferView(&constantBufferViewDesc,handle);
 	
 	//第二个描述符表示加速结构
@@ -102,7 +108,7 @@ void D3D12HelloTriangle::CreateRTXShaderResource()
 	SRVDesc.Format = DXGI_FORMAT_UNKNOWN;
 	SRVDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 	SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	SRVDesc.RaytracingAccelerationStructure.Location = m_topDestAccelerationStructureData->GetGPUVirtualAddress();
+	SRVDesc.RaytracingAccelerationStructure.Location = m_scene->m_topDestAccelerationStructureData->GetGPUVirtualAddress();
 	m_device->CreateShaderResourceView(nullptr, &SRVDesc, handle);
 
 	//第三个描述符表示光线追踪渲染的最终纹理
@@ -200,7 +206,7 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 void D3D12HelloTriangle::CreateShaderBindingTable()
 {
 	// The SBT helper class collects calls to Add*Program.  If called several
-// times, the helper must be emptied before re-adding shaders.
+    // times, the helper must be emptied before re-adding shaders.
 	m_sbtHelper.Reset();
 
 	// The pointer to the beginning of the heap is the only parameter required by
@@ -217,7 +223,12 @@ void D3D12HelloTriangle::CreateShaderBindingTable()
 	m_sbtHelper.AddMissProgram(L"Miss", {});
 
 	// Adding the triangle hit shader
-	m_sbtHelper.AddHitGroup(L"HitGroup", {});
+	for (auto Ite = m_scene->m_staticMeshObjects.begin(); Ite != m_scene->m_staticMeshObjects.end(); ++Ite)
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS IndexBufferAddress = m_scene->m_indexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInIndexBufferInBytes;
+		D3D12_GPU_VIRTUAL_ADDRESS VertexBufferAddress = m_scene->m_vertexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInVertexBufferInBytes;
+		m_sbtHelper.AddHitGroup(L"HitGroup", { (void*)IndexBufferAddress,(void*)VertexBufferAddress });
+	}
 
 	// Compute the size of the SBT given the number of shaders and their
     // parameters
@@ -404,8 +415,9 @@ void D3D12HelloTriangle::CreateRootSignature()
 {
 	//创建光栅化根签名
 	{
-		CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+		CD3DX12_ROOT_PARAMETER1 rootParameters[2];
 		rootParameters[0].InitAsConstantBufferView(0, 0);
+		rootParameters[1].InitAsConstantBufferView(1, 0);
 
 		// Allow input layout and deny uneccessary access to certain pipeline stages.
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -451,16 +463,9 @@ void D3D12HelloTriangle::CreateGraphicsPipelineState()
 	ThrowIfFailed(D3DCompileFromFile(GetAssetFullPath(L"shaders.hlsl").c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
 	ThrowIfFailed(D3DCompileFromFile(GetAssetFullPath(L"shaders.hlsl").c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
 
-	// Define the vertex input layout.
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	};
-
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+	psoDesc.InputLayout = { Vertex::InputElementDesc, _countof(Vertex::InputElementDesc) };
 	psoDesc.pRootSignature = m_rasterizationRootSignature.Get();
 	psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
 	psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
@@ -478,12 +483,7 @@ void D3D12HelloTriangle::CreateGraphicsPipelineState()
 
 void D3D12HelloTriangle::CreateScene()
 {
-	CreateMeshes();
-
-	m_sceneData.m_ambientColor = DirectX::XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-
-	m_sceneDataGPUBuffer.CreateBuffer(m_device.Get());
-	m_sceneDataGPUBuffer.CopyDataToGPU(m_sceneData);
+	m_scene = Scene::CreateTestScene(m_device.Get(), m_commandList.Get(), m_width, m_height);
 
 	//执行命令列表
 	m_commandList->Close();
@@ -495,161 +495,14 @@ void D3D12HelloTriangle::CreateScene()
 	m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent);
 	WaitForSingleObject(m_fenceEvent, INFINITE);
 
-}
 
-void D3D12HelloTriangle::CreateMeshes()
-{
-	// Define the geometry for a triangle.
-	Vertex triangleVertices[] =
-	{
-		{ { 0.0f, 0.25f * m_aspectRatio, 0.0f}, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.25f, -0.25f * m_aspectRatio, 0.0f}, { 0.0f, 0.0f, 1.0f, 1.0f } }
-	};
-
-	const UINT vertexBufferSize = sizeof(triangleVertices);
-
-	// Note: using upload heaps to transfer static data like vert buffers is not 
-	// recommended. Every time the GPU needs it, the upload heap will be marshalled 
-	// over. Please read up on Default Heap usage. An upload heap is used here for 
-	// code simplicity and because there are very few verts to actually transfer.
-	ThrowIfFailed(m_device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_vertexBuffer)));
-
-	// Copy the triangle data to the vertex buffer.
-	UINT8* pVertexDataBegin;
-	CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-	ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-	memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-	m_vertexBuffer->Unmap(0, nullptr);
-
-	// Initialize the vertex buffer view.
-	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-	m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-	m_vertexBufferView.SizeInBytes = vertexBufferSize;
-
-	
-	//构建加速结构
-	// 首先构建底层加速结构
-
-	//在加速结构构建期间，将以行为主的布局的3x4仿射变换矩阵的地址应用于VertexBuffer中的顶点。 不修改VertexBuffer的内容。 如果使用2D顶点格式，则在假定第三个顶点分量为零的情况下应用转换。
-	//如果Transform3x4为NULL，则不会对顶点进行变换。 使用Transform3x4可能会导致加速结构构建的计算和/或内存需求增加。
-	//指向的内存必须处于状态D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE。 该地址必须对齐为16个字节，定义为D3D12_RAYTRACING_TRANSFORM3X4_BYTE_ALIGNMENT。
-	
-	//IndexBuffer中索引的格式。 必须为以下之一：
-	//    DXGI_FORMAT_UNKNOWN - 当IndexBuffer为NULL时
-    //    DXGI_FORMAT_R32_UINT
-	//    DXGI_FORMAT_R16_UINT
-	// 顶点索引数组。 如果为NULL，则三角形不索引。 与graphics一样，地址必须与IndexFormat的大小对齐。
-	// 指向的内存必须处于状态D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE。 请注意，如果应用程序希望在图形输入装配阶段和光线跟踪加速结构构建输入之间共享索引缓冲区输入，则它始终可以同时将资源置于读取状态的组合中，例如 D3D12_RESOURCE_STATE_INDEX_BUFFER | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE。
-	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-	geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer->GetGPUVirtualAddress();
-	geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-	geometryDesc.Triangles.VertexCount = 3;
-	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	geometryDesc.Triangles.IndexCount = 0;
-	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_UNKNOWN;
-	
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	inputs.NumDescs = 1;
-	inputs.pGeometryDescs = &geometryDesc;
-
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO Info = {};
-	m_device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &Info);
-
-	//必须D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT字节对齐
-	UINT64 resultSizeInBytes = ROUND_UP(Info.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
-	UINT64 scratchDataSizeInBytes = ROUND_UP(Info.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
-	//资源状态必须是D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
-	m_bottomDestAccelerationStructureData = CreateDefaultBuffer(m_device.Get(), resultSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,  D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	m_bottomScratchAccelerationStructureData = CreateDefaultBuffer(m_device.Get(), scratchDataSizeInBytes, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomDesc = {};
-	bottomDesc.Inputs = inputs;
-	bottomDesc.ScratchAccelerationStructureData = m_bottomScratchAccelerationStructureData->GetGPUVirtualAddress();
-	bottomDesc.DestAccelerationStructureData = m_bottomDestAccelerationStructureData->GetGPUVirtualAddress();
-	m_commandList->BuildRaytracingAccelerationStructure(&bottomDesc, 0, nullptr);
-
-	// Wait for the builder to complete by setting a barrier on the resulting
-	// buffer. This is particularly important as the construction of the top-level
-	// hierarchy may be called right afterwards, before executing the command
-	// list.
-	// 通过在结果缓冲区上设置屏障来等待构建器完成。 这一点尤其重要，因为可以在执行命令列表之前立即调用顶层层次结构。
-	D3D12_RESOURCE_BARRIER uavBarrier;
-	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	uavBarrier.UAV.pResource = m_bottomDestAccelerationStructureData.Get();
-	uavBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	m_commandList->ResourceBarrier(1, &uavBarrier);
-
-	// 构建顶级加速结构
-
-	//每个实例必须D3D12_RAYTRACING_INSTANCE_DESCS_BYTE_ALIGNMENT对齐。
-	UINT64 instanceSizeInBytes = ROUND_UP(sizeof(D3D12_RAYTRACING_INSTANCE_DESC), D3D12_RAYTRACING_INSTANCE_DESCS_BYTE_ALIGNMENT);
-	UINT64 allInstanceSizeInBytes = CalculateConstantBufferByteSize(instanceSizeInBytes * 1);
-	m_instance = CreateUploadBuffer(m_device.Get(), allInstanceSizeInBytes, D3D12_RESOURCE_STATE_GENERIC_READ);
-	
-	D3D12_RAYTRACING_INSTANCE_DESC *pInstanceDesc = nullptr;
-	ThrowIfFailed(m_instance->Map(0, nullptr, reinterpret_cast<void**>(&pInstanceDesc)));
-	ZeroMemory(pInstanceDesc, allInstanceSizeInBytes);
-
-	pInstanceDesc[0].InstanceID = 0;
-	pInstanceDesc[0].InstanceMask = 0xFF;
-	pInstanceDesc[0].InstanceContributionToHitGroupIndex = 0;
-	pInstanceDesc[0].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-	pInstanceDesc[0].AccelerationStructure = m_bottomDestAccelerationStructureData->GetGPUVirtualAddress();
-
-	DirectX::XMFLOAT3X4 t(1.0f,0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f);
-
-	memcpy(&(pInstanceDesc[0].Transform), &t, sizeof(t));
-	
-	m_instance->Unmap(0, nullptr);             
-
-
-
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS TopInputs = {};
-	TopInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-	TopInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-	TopInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	TopInputs.NumDescs = 1;
-
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO TopInfo = {};
-	m_device->GetRaytracingAccelerationStructurePrebuildInfo(&TopInputs, &TopInfo);
-
-	resultSizeInBytes = ROUND_UP(TopInfo.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
-	scratchDataSizeInBytes = ROUND_UP(TopInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
-	m_topDestAccelerationStructureData = CreateDefaultBuffer(m_device.Get(), resultSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    m_topScratchAccelerationStructureData = CreateDefaultBuffer(m_device.Get(), scratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-	TopInputs.InstanceDescs = m_instance->GetGPUVirtualAddress();
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topDesc = {};
-	topDesc.Inputs = TopInputs;
-	topDesc.ScratchAccelerationStructureData = m_topScratchAccelerationStructureData->GetGPUVirtualAddress();
-	topDesc.DestAccelerationStructureData = m_topDestAccelerationStructureData->GetGPUVirtualAddress();
-
-	m_commandList->BuildRaytracingAccelerationStructure(&topDesc, 0, nullptr);
-
-	D3D12_RESOURCE_BARRIER uavBarrier2;
-	uavBarrier2.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	uavBarrier2.UAV.pResource = m_topDestAccelerationStructureData.Get();
-	uavBarrier2.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	m_commandList->ResourceBarrier(1, &uavBarrier2);
+	m_scene->ReleaseTempResource();
 }
 
 // Update frame-based values.
 void D3D12HelloTriangle::OnUpdate()
 {
+	m_scene->Update();
 }
 
 // Render the scene.
@@ -675,6 +528,49 @@ void D3D12HelloTriangle::OnDestroy()
     WaitForPreviousFrame();
 
     CloseHandle(m_fenceEvent);
+
+	//删除场景
+	m_scene.reset();
+
+	return;               //D3D的退出机制还不清楚，先不写。
+
+	m_sbtHelper.Reset();
+	m_sbtStorage.Reset();
+
+	m_rtStateObjectProps.Reset();
+	m_rtStateObject.Reset();
+
+	m_rayGenSignature.Reset();
+	m_hitSignature.Reset();
+	m_missSignature.Reset();
+
+	m_rtxHeap.Reset();
+	m_outputResource.Reset();
+
+	m_pipelineState.Reset();
+	m_rtxGlobalRootSignature.Reset();
+	m_rasterizationRootSignature.Reset();
+	m_rtvHeap.Reset();
+	for (int i = 0; i < FrameCount; ++i)
+	{
+		m_renderTargets[i].Reset();
+	}
+	m_swapChain.Reset();
+
+	m_commandList.Reset();
+	m_commandAllocator.Reset();
+	m_fence.Reset();
+	m_commandQueue.Reset();
+	m_device.Reset();
+
+#if defined(_DEBUG)
+	Microsoft::WRL::ComPtr<IDXGIDebug> dxgiDebug;
+	//if (SUCCEEDED(DXGIGetDebugInterface(IID_PPV_ARGS(&dxgiDebug))))
+	//{
+	//	ThrowIfFailed(dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL));
+	//}
+
+#endif
 }
 
 void D3D12HelloTriangle::PopulateCommandList()
@@ -694,7 +590,7 @@ void D3D12HelloTriangle::PopulateCommandList()
 	{
 		// Set necessary state.
 		m_commandList->SetGraphicsRootSignature(m_rasterizationRootSignature.Get());
-		m_commandList->SetGraphicsRootConstantBufferView(0, m_sceneDataGPUBuffer.m_resource->GetGPUVirtualAddress());
+		m_commandList->SetGraphicsRootConstantBufferView(0, m_scene->m_scenetBuffer.GetGpuVirtualAddress());
 		m_commandList->RSSetViewports(1, &m_viewport);
 		m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -708,8 +604,8 @@ void D3D12HelloTriangle::PopulateCommandList()
 		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 		m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		m_commandList->DrawInstanced(3, 1, 0, 0);
+		
+		m_scene->Draw(m_commandList.Get());
 	}
 	else
 	{

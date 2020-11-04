@@ -11,6 +11,7 @@
 
 #pragma once
 #include <stdexcept>
+#include <cassert>
 
 // Note that while ComPtr is used to manage the lifetime of resources on the CPU,
 // it has no understanding of the lifetime of resources on the GPU. Apps must account
@@ -255,4 +256,54 @@ public:
 	{
 		memcpy(m_data, &InData, m_bufferSize);
 	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() { return m_resource->GetGPUVirtualAddress(); }
+	UINT64 GetBufferSize() { return m_bufferSize; }
 };
+
+
+template<typename T>
+class StructArrayUploadBuffer
+{
+public:
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
+	UINT64 m_bufferSize = 0;
+	UINT   m_elementSize = 0;
+	UINT   m_num = 0;
+	UINT8 *m_data = nullptr;
+
+	~StructArrayUploadBuffer()
+	{
+		if (m_data != nullptr)
+		{
+			m_resource->Unmap(0, nullptr);
+			m_data = nullptr;
+		}
+
+		m_bufferSize = 0;
+		m_num = 0;
+	}
+
+	void CreateBuffer(ID3D12Device5 *InDevice,UINT Num)
+	{
+		assert(Num > 0);
+		m_num = Num;
+		m_elementSize = CalculateConstantBufferByteSize(sizeof(T));
+		m_bufferSize = Num * m_elementSize;
+		m_resource = CreateUploadBuffer(InDevice, m_bufferSize, D3D12_RESOURCE_STATE_GENERIC_READ);
+		ThrowIfFailed(m_resource->Map(0, nullptr, reinterpret_cast<void**>(&m_data)));
+	}
+
+	void CopyDataToGPU(const T& InData,UINT InElement)
+	{
+		assert(InElement >= 0);
+		assert(InElement < m_num);
+		memcpy( m_data + InElement * m_elementSize, &InData, sizeof(T));
+	}
+
+	inline D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() { return m_resource->GetGPUVirtualAddress(); }
+	inline UINT64 GetBufferSize() { return m_bufferSize; }
+	inline UINT   GetElementSize() { return m_elementSize; }
+	inline D3D12_GPU_VIRTUAL_ADDRESS GetElementGpuVirtualAddress(UINT InElement) { return GetGpuVirtualAddress() + InElement * GetElementSize(); }
+};
+

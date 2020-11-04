@@ -36,9 +36,6 @@
     <ClInclude Include="Win32Application.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Common\Camera.h">
-      <Filter>Common</Filter>
-    </ClInclude>
     <ClInclude Include="Common\d3dUtil.h">
       <Filter>Common</Filter>
     </ClInclude>
@@ -76,6 +73,12 @@
       <Filter>nv_helpers_dx12</Filter>
     </ClInclude>
     <ClInclude Include="DXRHelper.h" />
+    <ClInclude Include="MeshObject.h" />
+    <ClInclude Include="Scene.h" />
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="Common\Camera2.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -92,9 +95,6 @@
     </ClCompile>
     <ClCompile Include="Win32Application.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Common\Camera.cpp">
-      <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="Common\d3dUtil.cpp">
       <Filter>Common</Filter>
@@ -126,6 +126,11 @@
     </ClCompile>
     <ClCompile Include="nv_helpers_dx12\TopLevelASGenerator.cpp">
       <Filter>nv_helpers_dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshObject.cpp" />
+    <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Common\Camera2.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

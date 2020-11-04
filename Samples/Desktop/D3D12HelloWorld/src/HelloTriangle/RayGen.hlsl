@@ -3,22 +3,45 @@
 // Raytracing output texture, accessed as a UAV
 RWTexture2D< float4 > gOutput : register(u0);
 
+inline void GenerateCameraRay(in uint2 index, out float3 origin, out float3 dir)
+{
+	float2 xy = index + 0.5f;
+	float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;
+
+	screenPos.y = -screenPos.y;
+
+	float CameraNear = g_CameraInfo.y;
+
+	float4 world = mul(float4(screenPos.x * CameraNear, screenPos.y * CameraNear, 0, CameraNear), g_ProjectionToWorld);
+
+	//world.xyz /= world.w;
+	origin = g_CameraPos.xyz;
+	dir = normalize( world.xyz - origin );
+}
+
 [shader("raygeneration")] 
 void RayGen() {
   // Initialize the ray payload
   HitInfo payload;
   payload.colorAndDistance = float4(0.9, 0.6, 0.2, 1);
 
-  // Get the location within the dispatched 2D grid of work items
-  // (often maps to pixels, so this could represent a pixel coordinate).
   uint2 launchIndex = DispatchRaysIndex();
-  float2 dims = float2(DispatchRaysDimensions().xy);
-  float2 d = (((launchIndex.xy + 0.5f) / dims.xy) * 2.f - 1.f);
+  float3 OriginInWorld;
+  float3 Dir;
+
+  GenerateCameraRay(launchIndex, OriginInWorld, Dir);
+
+  //uint2 xy = DispatchRaysDimensions();
+
+  //float2 halfxy = xy / 2.0f;
+  //float2 origin = (launchIndex + 0.5f) - halfxy;
 
   // Define a ray, consisting of origin, direction, and the min-max distance values
   RayDesc ray;
-  ray.Origin = float3(d.x, -d.y, -1);      //再观察空间摄像机朝向z轴观察，这里改了光线的方向。
-  ray.Direction = float3(0, 0, 1);
+  ray.Origin = OriginInWorld;      //在观察空间摄像机朝向z轴观察，这里改了光线的方向。
+  ray.Direction = Dir;
+  //ray.Origin = float3(origin.x, origin.y, 400.0f);
+  //ray.Direction = float3(0.0f, 0.0f, -1.0f);
   ray.TMin = 0;
   ray.TMax = 100000;
 

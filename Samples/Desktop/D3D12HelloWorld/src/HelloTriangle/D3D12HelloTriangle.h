@@ -13,6 +13,7 @@
 
 #include "DXSample.h"
 #include "nv_helpers_dx12/ShaderBindingTableGenerator.h"
+#include "Scene.h"
 
 #include <dxcapi.h>
 
@@ -45,12 +46,6 @@ public:
 private:
     static const UINT FrameCount = 2;
 
-    struct Vertex
-    {
-        XMFLOAT3 position;
-        XMFLOAT4 color;
-    };
-
 	struct SceneData
 	{
 		DirectX::XMFLOAT4  m_ambientColor;
@@ -73,27 +68,14 @@ private:
     ComPtr<ID3D12GraphicsCommandList4> m_commandList;
     UINT m_rtvDescriptorSize;
 
-    // App resources.
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-
     // Synchronization objects.
     UINT m_frameIndex;
     HANDLE m_fenceEvent;
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue;
 
-	SceneData m_sceneData;
-	StructUploadBuffer<SceneData> m_sceneDataGPUBuffer;
-
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_outputResource;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtxHeap;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_bottomScratchAccelerationStructureData;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_bottomDestAccelerationStructureData;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_topDestAccelerationStructureData;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_topScratchAccelerationStructureData;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_instance;
 
 	ComPtr<IDxcBlob> m_rayGenLibrary;
 	ComPtr<IDxcBlob> m_hitLibrary;
@@ -112,13 +94,14 @@ private:
 	nv_helpers_dx12::ShaderBindingTableGenerator m_sbtHelper;
 	ComPtr<ID3D12Resource> m_sbtStorage;
 
+	std::shared_ptr< Scene> m_scene;
+
 	void CreateShaderBindingTable();
 
     void LoadPipeline();
     void LoadAssets();
 	void CheckRaytracingSupport();
 	void CreateScene();
-	void CreateMeshes();
 	void CreateRootSignature();
 	// #DXR
 	ComPtr<ID3D12RootSignature> CreateRayGenSignature();

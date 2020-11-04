@@ -15,10 +15,25 @@ struct Attributes
   float2 bary;
 };
 
+struct Vertex
+{
+	float3 position : POSITION;
+	float3 normal : NORMAL;
+	float3 tangent : TANGENT;
+	float4 color : COLOR;
+	float2 uv1 : TEXCOORD0;
+	float2 uv2 : TEXCOORD1;
+};
 
 cbuffer SceneData : register(b0)
 {
-	float4 g_ambientColor;
+	float4x4 g_ViewProj;
+	float4x4 g_ProjectionToWorld;
+	float4   g_CameraPos;
+	float4   g_CameraInfo;
+	float4   g_AmbientColor;
+	float4   g_DirectionalLightDirection;
+	float4   g_DirectionalLightColor;
 };
 
 // Raytracing acceleration structure, accessed as a SRV
