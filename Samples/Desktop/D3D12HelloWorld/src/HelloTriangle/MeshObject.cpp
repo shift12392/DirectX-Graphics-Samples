@@ -131,7 +131,7 @@ StaticMesh * StaticMesh::MakeCube(const std::wstring &InName, float x, float y, 
 
 	for (auto Ite = Cube->m_vertexs.begin(); Ite != Cube->m_vertexs.end(); ++Ite)
 	{
-		Ite->color = DirectX::XMFLOAT4(1, 1, 0, 1);
+		Ite->color = DirectX::XMFLOAT4(1, 1, 1, 1);
 	}
 
 	//
@@ -183,10 +183,10 @@ StaticMesh* StaticMesh::MakePlane(const std::wstring &InName,float x, float y)
 
 	//注：先不用切线方向
 	Vertex v[4];
-	v[0] = Vertex(DirectX::XMFLOAT3(xHalf, -yHalf, 0.0f),  DirectX::XMFLOAT3( 0, 0, 1), DirectX::XMFLOAT3( 0, 0, 0), DirectX::XMFLOAT4( 1,0,0,1), DirectX::XMFLOAT4(0, 0, 0, 0));
-	v[1] = Vertex(DirectX::XMFLOAT3(xHalf, yHalf, 0.0f),   DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(0, 1, 0, 1), DirectX::XMFLOAT4(1, 0, 0, 0));
-	v[2] = Vertex(DirectX::XMFLOAT3(-xHalf, yHalf, 0.0f),  DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(0, 0, 1, 1), DirectX::XMFLOAT4(0, 1, 0, 0));
-	v[3] = Vertex(DirectX::XMFLOAT3(-xHalf, -yHalf, 0.0f), DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(1, 1, 0, 1), DirectX::XMFLOAT4(1, 1, 0, 0));
+	v[0] = Vertex(DirectX::XMFLOAT3(xHalf, -yHalf, 0.0f),  DirectX::XMFLOAT3( 0, 0, 1), DirectX::XMFLOAT3( 0, 0, 0), DirectX::XMFLOAT4( 1,1,1,1), DirectX::XMFLOAT4(0, 0, 0, 0));
+	v[1] = Vertex(DirectX::XMFLOAT3(xHalf, yHalf, 0.0f),   DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(1, 1, 1, 1), DirectX::XMFLOAT4(1, 0, 0, 0));
+	v[2] = Vertex(DirectX::XMFLOAT3(-xHalf, yHalf, 0.0f),  DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(1, 1, 1, 1), DirectX::XMFLOAT4(0, 1, 0, 0));
+	v[3] = Vertex(DirectX::XMFLOAT3(-xHalf, -yHalf, 0.0f), DirectX::XMFLOAT3(0, 0, 1), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(1, 1, 1, 1), DirectX::XMFLOAT4(1, 1, 0, 0));
 
 	Plane->m_vertexs.assign(&v[0], &v[4]);
 

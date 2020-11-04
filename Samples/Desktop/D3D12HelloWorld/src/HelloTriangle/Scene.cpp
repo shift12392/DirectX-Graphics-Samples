@@ -222,8 +222,10 @@
 		NewSceneData.m_CameraInfo = DirectX::XMFLOAT4(NewCamera->m_aspectRatio, NewCamera->m_near, NewCamera->m_far, 0.0f);
 		//ÉèÖÃµÆ¹â
 		NewSceneData.m_AmbientColor = DirectX::XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-		NewSceneData.m_DirectionalLightColor = DirectX::XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f);
-		NewSceneData.m_DirectionalLightDirection = DirectX::XMFLOAT4(-1.0f, -1.0f, -1.0f, 1.0f);
+		NewSceneData.m_DirectionalLightDirection = DirectX::XMFLOAT4(0.0f, 1.0f, -1.0f, 0.0f);
+		DirectX::XMVECTOR DirectionalLightDir = DirectX::XMLoadFloat4(&NewSceneData.m_DirectionalLightDirection);
+		DirectionalLightDir = DirectX::XMVector4Normalize(DirectionalLightDir);
+		DirectX::XMStoreFloat4(&NewSceneData.m_DirectionalLightDirection, DirectionalLightDir);
 		
 		NewScene->UpdateSceneData(NewSceneData);
 
