@@ -128,6 +128,8 @@ public:
 		const D3D_SHADER_MACRO* defines,
 		const std::string& entrypoint,
 		const std::string& target);
+
+	static Microsoft::WRL::ComPtr<ID3D12RootSignature> SerializeRootSignature(ID3D12Device5 *InDevice, CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc);
 };
 
 class DxException

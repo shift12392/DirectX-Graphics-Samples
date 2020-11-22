@@ -80,10 +80,12 @@ private:
 	ComPtr<IDxcBlob> m_rayGenLibrary;
 	ComPtr<IDxcBlob> m_hitLibrary;
 	ComPtr<IDxcBlob> m_missLibrary;
+	ComPtr<IDxcBlob> m_LightLibrary;
 
 	ComPtr<ID3D12RootSignature> m_rayGenSignature;
 	ComPtr<ID3D12RootSignature> m_hitSignature;
 	ComPtr<ID3D12RootSignature> m_missSignature;
+	ComPtr<ID3D12RootSignature> m_lightSignature;
 
 	// Ray tracing pipeline state
 	ComPtr<ID3D12StateObject> m_rtStateObject;
@@ -115,6 +117,4 @@ private:
     void PopulateCommandList();
     void WaitForPreviousFrame();
 
-
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> SerializeRootSignature(CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc);
 };

@@ -113,6 +113,18 @@ ComPtr<ID3DBlob> d3dUtil::CompileShader(
 	return byteCode;
 }
 
+Microsoft::WRL::ComPtr<ID3D12RootSignature> d3dUtil::SerializeRootSignature(ID3D12Device5 *InDevice, CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc)
+{
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+	ThrowIfFailed(InDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+
+	return rootSignature;
+}
+
 std::wstring DxException::ToString()const
 {
     // Get the string description of the error code.

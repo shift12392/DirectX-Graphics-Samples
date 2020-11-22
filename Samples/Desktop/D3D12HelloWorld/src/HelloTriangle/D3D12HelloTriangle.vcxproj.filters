@@ -79,6 +79,7 @@
     <ClInclude Include="Common\Camera2.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="ProceduralMesh.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -132,6 +133,7 @@
     <ClCompile Include="Common\Camera2.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="ProceduralMesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders.hlsl">

@@ -9,9 +9,14 @@
 #include <Windows.h>
 #include <DirectXMath.h>
 #include <cstdint>
+#include <utility>
 
 class MathHelper
 {
+public:
+	static const float Infinity;
+	static const float Pi;
+
 public:
 	// Returns random float in [0, 1).
 	static float RandF()
@@ -92,8 +97,24 @@ public:
     static DirectX::XMVECTOR RandUnitVec3();
     static DirectX::XMVECTOR RandHemisphereUnitVec3(DirectX::XMVECTOR n);
 
-	static const float Infinity;
-	static const float Pi;
+	//计算一元二次方程 a * X * X + bX + c = 0 的根
+	//返回true则有根，返回false则没有根
+	static bool SolveQuadratic(const float &a, const float &b, const float &c, float &x0, float &x1)
+	{
+		float discr = b * b - 4 * a * c;
+		if (discr < 0) return false;
+		else if (discr == 0) x0 = x1 = -0.5 * b / a;
+		else {
+			float q = (b > 0) ?
+				-0.5 * (b + sqrt(discr)) :
+				-0.5 * (b - sqrt(discr));
+			x0 = q / a;
+			x1 = c / q;
+		}
+		if (x0 > x1) std::swap(x0, x1);
+
+		return true;
+	}
 
 
 };

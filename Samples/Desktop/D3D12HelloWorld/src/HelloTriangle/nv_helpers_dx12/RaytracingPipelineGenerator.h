@@ -93,9 +93,11 @@ public:
   /// - The closest hit shader, invoked on the hit point closest to the ray start.
   /// The shaders in a hit group share the same root signature, and are only referred to by the
   /// hit group name in other places of the program.
-  void AddHitGroup(const std::wstring& hitGroupName, const std::wstring& closestHitSymbol,
+  void AddHitGroup(const std::wstring& hitGroupName, 
+	               const std::wstring& closestHitSymbol,
                    const std::wstring& anyHitSymbol = L"",
-                   const std::wstring& intersectionSymbol = L"");
+                   const std::wstring& intersectionSymbol = L"",
+	               D3D12_HIT_GROUP_TYPE Type = D3D12_HIT_GROUP_TYPE::D3D12_HIT_GROUP_TYPE_TRIANGLES);
 
   /// The shaders and hit groups may have various root signatures. This call associates a root
   /// signature to one or more symbols. All imported symbols must be associated to one root
@@ -149,7 +151,8 @@ private:
   struct HitGroup
   {
     HitGroup(std::wstring hitGroupName, std::wstring closestHitSymbol,
-             std::wstring anyHitSymbol = L"", std::wstring intersectionSymbol = L"");
+             std::wstring anyHitSymbol = L"", std::wstring intersectionSymbol = L"",
+		     D3D12_HIT_GROUP_TYPE inType = D3D12_HIT_GROUP_TYPE::D3D12_HIT_GROUP_TYPE_TRIANGLES);
 
     HitGroup(const HitGroup& source);
 
@@ -157,6 +160,7 @@ private:
     std::wstring m_closestHitSymbol;
     std::wstring m_anyHitSymbol;
     std::wstring m_intersectionSymbol;
+	D3D12_HIT_GROUP_TYPE m_type;
     D3D12_HIT_GROUP_DESC m_desc = {};
   };
 

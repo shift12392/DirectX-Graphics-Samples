@@ -39,9 +39,14 @@
 		{
 			Ite->second->ReleaseTempResource();
 		}
+
+		for (auto Ite = m_sphereLightObjects.begin(); Ite != m_sphereLightObjects.end(); ++Ite)
+		{
+			Ite->second->m_mesh->ReleaseTempResource();
+		}
 	}
 
-	void Scene::BuildBottomAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList)
+	void Scene::BuildStaticMeshAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList)
 	{
 		for (auto Ite = m_staticMeshes.begin(); Ite != m_staticMeshes.end(); ++Ite)
 		{
@@ -49,7 +54,15 @@
 		}
 	}
 
-	void Scene::CreateMeshBuffer(ID3D12Device5* InDevice)
+	void Scene::BuildProceduralMeshAS(ID3D12Device5 * device, ID3D12GraphicsCommandList4 * CommandList)
+	{
+		for (auto Ite = m_sphereLightObjects.begin(); Ite != m_sphereLightObjects.end(); ++Ite)
+		{
+			Ite->second->m_mesh->BuildAccelerationStructure(device, CommandList,m_aabbBuffer);
+		}
+	}
+
+	void Scene::CreateStaticMeshBuffer(ID3D12Device5* InDevice)
 	{
 		m_vertexBuffer = CreateUploadBuffer(InDevice, m_allVertexSizeInBytes, D3D12_RESOURCE_STATE_GENERIC_READ);
 		m_indexBuffer = CreateUploadBuffer(InDevice, m_allIndexSizeInBytes, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -103,9 +116,9 @@
 
 
 		//创建顶点和索引BUFFER。
-		CreateMeshBuffer(device);
+		CreateStaticMeshBuffer(device);
 		//给所有网格体构建底层加速结构
-		BuildBottomAccelerationStructure(device, commandList);
+		BuildStaticMeshAccelerationStructure(device, commandList);
 	}
 
 	void Scene::BuildTopAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList)
@@ -114,13 +127,16 @@
 
         //每个实例必须D3D12_RAYTRACING_INSTANCE_DESCS_BYTE_ALIGNMENT对齐。
 		UINT64 instanceSizeInBytes = ROUND_UP(sizeof(D3D12_RAYTRACING_INSTANCE_DESC), D3D12_RAYTRACING_INSTANCE_DESCS_BYTE_ALIGNMENT);
-		UINT64 allInstanceSizeInBytes = CalculateConstantBufferByteSize(instanceSizeInBytes * m_staticMeshObjects.size());
+		UINT32 InstanceNum = m_staticMeshObjects.size() + m_sphereLightObjects.size();        //在这里计算所有实例的数量。
+
+		UINT64 allInstanceSizeInBytes = CalculateConstantBufferByteSize(instanceSizeInBytes * InstanceNum);
 		m_pInstanceDesc = CreateUploadBuffer(device, allInstanceSizeInBytes, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 		D3D12_RAYTRACING_INSTANCE_DESC *pInstanceDesc = nullptr;
 		ThrowIfFailed(m_pInstanceDesc->Map(0, nullptr, reinterpret_cast<void**>(&pInstanceDesc)));
 		ZeroMemory(pInstanceDesc, allInstanceSizeInBytes);
 
+		//复制数据。
 		UINT i = 0;
 		for (auto Ite = m_staticMeshObjects.begin(); Ite != m_staticMeshObjects.end(); ++Ite)
 		{
@@ -134,13 +150,27 @@
 
 			++i;
 		}
+
+		for (auto Ite = m_sphereLightObjects.begin(); Ite != m_sphereLightObjects.end(); ++Ite)
+		{
+			pInstanceDesc[i].InstanceID = i;
+			pInstanceDesc[i].InstanceMask = 0xFF;             // 以后会对各种实例类型分组，灯光可以专门分成一组。目前先这样。
+			pInstanceDesc[i].InstanceContributionToHitGroupIndex = i;
+			pInstanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			pInstanceDesc[i].AccelerationStructure = Ite->second->m_mesh->GetResultAccelerationStructureBuffer()->GetGPUVirtualAddress();
+
+			memcpy(&(pInstanceDesc[i].Transform), &(Ite->second->GetLocalToWorld()), sizeof(pInstanceDesc[i].Transform));
+
+			++i;
+		}
+
 		m_pInstanceDesc->Unmap(0, nullptr);
 
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS TopInputs = {};
 		TopInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 		TopInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
 		TopInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		TopInputs.NumDescs = m_staticMeshObjects.size();
+		TopInputs.NumDescs = InstanceNum;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO TopInfo = {};
 		device->GetRaytracingAccelerationStructurePrebuildInfo(&TopInputs, &TopInfo);
@@ -200,8 +230,61 @@
 
 			++i;
 		}
+	}
 
-		BuildTopAccelerationStructure(device, commandList);
+	void Scene::CreateProceduralMeshBuffer(ID3D12Device5 * InDevice)
+	{
+		//------------- 创建所有AABB的Buffer -------------
+		UINT AABBSize = ProceduralMesh::AABBSize;
+		UINT AABBNum = m_sphereLightObjects.size();            //在这里计算所有的AABB数量
+		UINT64 BufferSize = AABBNum * AABBSize;
+		m_aabbBuffer = CreateUploadBuffer(InDevice, BufferSize,  D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		UINT *Data = nullptr;
+		ThrowIfFailed(m_aabbBuffer->Map(0, nullptr, reinterpret_cast<void**>(&Data)));
+
+		//先清零
+		ZeroMemory(Data, BufferSize);
+
+		//在这里复制AABB数据
+		UINT OffsetInAABBBuffer = 0;
+		for (auto Ite = m_sphereLightObjects.begin(); Ite != m_sphereLightObjects.end(); ++Ite)
+		{
+			Ite->second->m_mesh->OffsetInAABBBuffer = OffsetInAABBBuffer;
+			memcpy(Data + OffsetInAABBBuffer * AABBSize, &(Ite->second->m_mesh->m_aabb), AABBSize);
+			++OffsetInAABBBuffer;
+		}
+
+		m_aabbBuffer->Unmap(0, nullptr);
+
+		//---------------- 创建对象数据Buffer ---------
+		
+		//创建所有球形灯光数据Buffer
+		m_allSphereLightBuffer.CreateBuffer(InDevice, m_sphereLightObjects.size());
+		UINT OffsetInAllSphereLightBuffer = 0;
+		for (auto Ite = m_sphereLightObjects.begin(); Ite != m_sphereLightObjects.end(); ++Ite)
+		{
+			Ite->second->StartInAllSphereLightBuffer = OffsetInAllSphereLightBuffer;
+			m_allSphereLightBuffer.CopyDataToGPU(Ite->second->m_data, OffsetInAllSphereLightBuffer);
+			++OffsetInAllSphereLightBuffer;
+		}
+	}
+
+	void Scene::CollectLightObject(ID3D12Device5 * device, ID3D12GraphicsCommandList4 * commandList)
+	{
+		//球形灯光
+		std::shared_ptr<SphereLightObject> LightObject1 = std::make_shared<SphereLightObject>(L"SphereLight1", DirectX::XMFLOAT3(0, -100, 50), 10.0f);
+		
+
+		std::shared_ptr<SphereLightObject> LightObject2 = std::make_shared<SphereLightObject>(L"SphereLight2", DirectX::XMFLOAT3(0, 100, 50), 10.0f);
+		LightObject2->SetColor(DirectX::XMFLOAT4(1, 1, 0, 1));
+
+		m_sphereLightObjects.insert({ LightObject1->GetName(), LightObject1 });
+		m_sphereLightObjects.insert({ LightObject2->GetName(), LightObject2 });
+
+		CreateProceduralMeshBuffer(device);
+
+		BuildProceduralMeshAS(device, commandList);
 	}
 
 	std::shared_ptr<Scene> Scene::CreateTestScene(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList,float WindowWidth,float WindowHeight)
@@ -220,7 +303,7 @@
 		NewSceneData.m_ProjectionToWorld = NewCamera->m_ProjToWorld;
 		NewSceneData.m_CameraPos = NewCamera->m_pos;
 		NewSceneData.m_CameraInfo = DirectX::XMFLOAT4(NewCamera->m_aspectRatio, NewCamera->m_near, NewCamera->m_far, 0.0f);
-		//设置灯光
+		//设置太阳光和天空大气
 		NewSceneData.m_AmbientColor = DirectX::XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
 		NewSceneData.m_DirectionalLightDirection = DirectX::XMFLOAT4(0.0f, 1.0f, -1.0f, 0.0f);
 		DirectX::XMVECTOR DirectionalLightDir = DirectX::XMLoadFloat4(&NewSceneData.m_DirectionalLightDirection);
@@ -229,11 +312,15 @@
 		
 		NewScene->UpdateSceneData(NewSceneData);
 
-		//收集网格体
+		//收集静态网格体
 		NewScene->CollectStaticMesh(device,CommandList);
-
-		//创建对象
+		//创建静态网格对象
 		NewScene->CreateStaticMeshObject(device, CommandList);
+
+		//创建灯光对象
+		NewScene->CollectLightObject(device, CommandList);
+
+		NewScene->BuildTopAccelerationStructure(device, CommandList);
 
 		return NewScene;
 	}

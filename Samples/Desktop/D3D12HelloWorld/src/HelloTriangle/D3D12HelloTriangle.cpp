@@ -13,6 +13,8 @@
 #include "D3D12HelloTriangle.h"
 #include "nv_helpers_dx12/RaytracingPipelineGenerator.h"
 #include "DXRHelper.h"
+#include "Common/d3dUtil.h"
+
 #include <dxgidebug.h>
 
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) :
@@ -42,14 +44,14 @@ ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateRayGenSignature()
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
 	desc.Init_1_1(1, rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-	return SerializeRootSignature(desc);
+	return d3dUtil::SerializeRootSignature(m_device.Get(), desc);
 }
 
 ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateMissSignature()
 {
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
 	desc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-	return SerializeRootSignature(desc);
+	return d3dUtil::SerializeRootSignature(m_device.Get(), desc);
 }
 
 ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateHitSignature()
@@ -61,7 +63,7 @@ ComPtr<ID3D12RootSignature> D3D12HelloTriangle::CreateHitSignature()
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
 	desc.Init_1_1(_countof(rootParameter), rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-	return SerializeRootSignature(desc);
+	return d3dUtil::SerializeRootSignature(m_device.Get(), desc);
 }
 
 void D3D12HelloTriangle::CreateRTXShaderResource()
@@ -129,7 +131,8 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// used.
 	m_rayGenLibrary = nv_helpers_dx12::CompileShaderLibrary(L"RayGen.hlsl");
 	m_missLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Miss.hlsl");
-	m_hitLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Hit.hlsl");
+	m_hitLibrary = nv_helpers_dx12::CompileShaderLibrary(L"TriangleHit.hlsl");
+	m_LightLibrary = nv_helpers_dx12::CompileShaderLibrary(L"LightHit.hlsl");
 
 	// In a way similar to DLLs, each library is associated with a number of
 	// exported symbols. This
@@ -138,13 +141,27 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// using the [shader("xxx")] syntax
 	pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
 	pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
-	pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit" });
+	pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit_Triangle" });
+	pipeline.AddLibrary(m_LightLibrary.Get(), { SphereLightObject::s_ClosestName,SphereLightObject::s_IntersectionName });
 
 	// To be used, each DX12 shader needs a root signature defining which
     // parameters and buffers will be accessed.
 	m_rayGenSignature = CreateRayGenSignature();
 	m_missSignature = CreateMissSignature();
 	m_hitSignature = CreateHitSignature();
+
+	auto CreateLightSignature = [](ID3D12Device5* InDevice ) -> Microsoft::WRL::ComPtr<ID3D12RootSignature>
+	{
+		CD3DX12_ROOT_PARAMETER1 rootParameter[1];
+		rootParameter[0].InitAsConstantBufferView(1, 0);
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
+		desc.Init_1_1(1, rootParameter,0,nullptr,D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+
+		return d3dUtil::SerializeRootSignature(InDevice, desc);
+	};
+
+	m_lightSignature = CreateLightSignature(m_device.Get());
 
 	// 3 different shaders can be invoked to obtain an intersection: an
 	// intersection shader is called
@@ -163,7 +180,8 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 
 	// Hit group for the triangles, with a shader simply interpolating vertex
 	// colors
-	pipeline.AddHitGroup(L"HitGroup", L"ClosestHit");
+	pipeline.AddHitGroup(L"HitGroup_Triangle", L"ClosestHit_Triangle");
+	pipeline.AddHitGroup(SphereLightObject::s_HitGroupName, SphereLightObject::s_ClosestName, L"", SphereLightObject::s_IntersectionName,D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
 
 	// The following section associates the root signature to each shader. Note
 	// that we can explicitly show that some shaders share the same root signature
@@ -172,7 +190,9 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// closest-hit shaders share the same root signature.
 	pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), { L"RayGen" });
 	pipeline.AddRootSignatureAssociation(m_missSignature.Get(), { L"Miss" });
-	pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), { L"HitGroup" });
+	pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), { L"HitGroup_Triangle" });
+	pipeline.AddRootSignatureAssociation(m_lightSignature.Get(), { SphereLightObject::s_HitGroupName });
+
 	pipeline.SetGlobalRootSignature(m_rtxGlobalRootSignature);                        
 
 	// The payload size defines the maximum size of the data carried by the rays,
@@ -186,7 +206,7 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// our sample we just use the barycentric coordinates defined by the weights
 	// u,v of the last two vertices of the triangle. The actual barycentrics can
 	// be obtained using float3 barycentrics = float3(1.f-u-v, u, v);
-	pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
+	pipeline.SetMaxAttributeSize(3 * sizeof(float));     // barycentric coordinates    //注：击中程序网格的属性最大
 
 	// The raytracing process can shoot rays from existing hit points, resulting
 	// in nested TraceRay calls. Our sample code traces only primary rays, which
@@ -213,6 +233,7 @@ void D3D12HelloTriangle::CreateShaderBindingTable()
 	// shaders without root parameters
 	D3D12_GPU_DESCRIPTOR_HANDLE GenHeapHandle = m_rtxHeap->GetGPUDescriptorHandleForHeapStart();
 
+	//指向光线追踪渲染纹理的描述符句柄
 	auto heapPointer = reinterpret_cast<UINT64*>(GenHeapHandle.ptr + 2 * m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 
 	// The ray generation only uses heap data
@@ -227,7 +248,14 @@ void D3D12HelloTriangle::CreateShaderBindingTable()
 	{
 		D3D12_GPU_VIRTUAL_ADDRESS IndexBufferAddress = m_scene->m_indexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInIndexBufferInBytes;
 		D3D12_GPU_VIRTUAL_ADDRESS VertexBufferAddress = m_scene->m_vertexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInVertexBufferInBytes;
-		m_sbtHelper.AddHitGroup(L"HitGroup", { (void*)IndexBufferAddress,(void*)VertexBufferAddress });
+		m_sbtHelper.AddHitGroup(L"HitGroup_Triangle", { (void*)IndexBufferAddress,(void*)VertexBufferAddress });
+	}
+
+	// 添加球形灯光 hit shader
+	for (auto Ite = m_scene->m_sphereLightObjects.begin(); Ite != m_scene->m_sphereLightObjects.end(); ++Ite)
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS LightDataAddress = m_scene->m_allSphereLightBuffer.GetElementGpuVirtualAddress(Ite->second->StartInAllSphereLightBuffer);
+		m_sbtHelper.AddHitGroup(SphereLightObject::s_HitGroupName, { (void*)LightDataAddress });
 	}
 
 	// Compute the size of the SBT given the number of shaders and their
@@ -429,7 +457,7 @@ void D3D12HelloTriangle::CreateRootSignature()
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
 
-		m_rasterizationRootSignature = SerializeRootSignature(rootSignatureDesc);
+		m_rasterizationRootSignature = d3dUtil::SerializeRootSignature(m_device.Get(), rootSignatureDesc);
 	}
 
 
@@ -444,7 +472,7 @@ void D3D12HelloTriangle::CreateRootSignature()
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters);    //D3D12_ROOT_SIGNATURE_FLAG_NONE默认是全局跟签名
 
-		m_rtxGlobalRootSignature = SerializeRootSignature(rootSignatureDesc);
+		m_rtxGlobalRootSignature = d3dUtil::SerializeRootSignature(m_device.Get(), rootSignatureDesc);
 	}
 }
 
@@ -734,14 +762,3 @@ void D3D12HelloTriangle::WaitForPreviousFrame()
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
-Microsoft::WRL::ComPtr<ID3D12RootSignature> D3D12HelloTriangle::SerializeRootSignature(CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc)
-{
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
-
-	ComPtr<ID3DBlob> signature;
-	ComPtr<ID3DBlob> error;
-	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
-	ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
-
-	return rootSignature;
-}

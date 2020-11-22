@@ -15,7 +15,7 @@
 
 class DXSample;
 
-class Win32Application
+class Win32Application : public NonCopyable
 {
 public:
     static int Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow);

@@ -193,12 +193,13 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
         XMFLOAT4 red = XMFLOAT4(1.0f, 0.5f, 0.5f, 1.0f);
         XMFLOAT4 yellow = XMFLOAT4(1.0f, 1.0f, 0.5f, 1.0f);
+		XMFLOAT4 Blue = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
         
         UINT offset = 0;
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
-            SetAttributes(offset + AABB, red);
+            SetAttributes(offset + AABB, Blue);
             SetAttributes(offset + Spheres, ChromiumReflectance, 1);
             offset += AnalyticPrimitive::Count;
         }
@@ -812,8 +813,10 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
         instanceDesc.AccelerationStructure = bottomLevelASaddresses[BottomLevelASType::AABB];
 
         // Move all AABBS above the ground plane.
-        XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(0, c_aabbWidth/2, 0)));
-        XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
+        XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(0, 2, 0)));
+		XMMATRIX Rotation = XMMatrixRotationY(DirectX::XMConvertToRadians(30.0f));
+		XMMATRIX ASToWorld = Rotation * mTranslation;
+        XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), ASToWorld);
     }
     UINT64 bufferSize = static_cast<UINT64>(instanceDescs.size() * sizeof(instanceDescs[0]));
     AllocateUploadBuffer(device, instanceDescs.data(), bufferSize, &(*instanceDescsResource), L"InstanceDescs");
@@ -896,6 +899,7 @@ void D3D12RaytracingProceduralGeometry::BuildAccelerationStructures()
     // Build bottom-level AS.
     AccelerationStructureBuffers bottomLevelAS[BottomLevelASType::Count];
     array<vector<D3D12_RAYTRACING_GEOMETRY_DESC>, BottomLevelASType::Count> geometryDescs;
+
     {
         BuildGeometryDescsForBottomLevelAS(geometryDescs);
 

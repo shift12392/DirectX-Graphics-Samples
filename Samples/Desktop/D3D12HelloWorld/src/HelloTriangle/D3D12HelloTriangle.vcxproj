@@ -128,6 +128,7 @@
     <ClInclude Include="nv_helpers_dx12\RootSignatureGenerator.h" />
     <ClInclude Include="nv_helpers_dx12\ShaderBindingTableGenerator.h" />
     <ClInclude Include="nv_helpers_dx12\TopLevelASGenerator.h" />
+    <ClInclude Include="ProceduralMesh.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="D3D12HelloTriangle.h" />
@@ -169,6 +170,7 @@
     <ClCompile Include="nv_helpers_dx12\TopLevelASGenerator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ProceduralMesh.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Win32Application.cpp" />
     <ClCompile Include="D3D12HelloTriangle.cpp" />

@@ -124,10 +124,7 @@ bool IsCulled(in Ray ray, in float3 hitSurfaceNormal)
 {
     float rayDirectionNormalDot = dot(ray.direction, hitSurfaceNormal);
 
-    bool isCulled = 
-        ((RayFlags() & RAY_FLAG_CULL_BACK_FACING_TRIANGLES) && (rayDirectionNormalDot > 0))
-        ||
-        ((RayFlags() & RAY_FLAG_CULL_FRONT_FACING_TRIANGLES) && (rayDirectionNormalDot < 0));
+    bool isCulled = ((RayFlags() & RAY_FLAG_CULL_BACK_FACING_TRIANGLES) && (rayDirectionNormalDot > 0)) || ((RayFlags() & RAY_FLAG_CULL_FRONT_FACING_TRIANGLES) && (rayDirectionNormalDot < 0));
 
     return isCulled; 
 }

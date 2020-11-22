@@ -2,12 +2,13 @@
 
 #include <unordered_map>
 #include "MeshObject.h"
+#include "ProceduralMesh.h"
 #include "Camera.h"
 #include "Common/MathHelper.h"
 
 
 
-	class Scene
+	class Scene : public NonCopyable
 	{
 	public:
 		~Scene()
@@ -38,10 +39,15 @@
 
 		//每个StaticMeshObject用常量数据
 		StructArrayUploadBuffer<ObjectData> m_allObjectBuffer;
+		StructArrayUploadBuffer<SphereLightObject::SphereLightData>  m_allSphereLightBuffer;   //所有的灯光对象常量数据
+
 
 		std::unordered_map<std::wstring, std::shared_ptr< Camera> >           m_cameras;
+
 		std::unordered_map<std::wstring, std::shared_ptr<StaticMesh> >        m_staticMeshes;
 		std::unordered_map<std::wstring, std::shared_ptr< StaticMeshObject> >  m_staticMeshObjects;
+		//std::unordered_map<std::wstring, std::shared_ptr<ProceduralMeshObject>>      m_proceduralMeshObject;
+		std::unordered_map<std::wstring, std::shared_ptr<SphereLightObject>>      m_sphereLightObjects;
 
 		UINT64 m_allVertexNum    = 0;
 		UINT64 m_allIndexNum     = 0;
@@ -56,12 +62,15 @@
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_topDestAccelerationStructureData;       // Where the AS is
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_pInstanceDesc;                          // Hold the matrices of the instances
 
-		
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_aabbBuffer;
 
 		void Init(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList);
 		void UpdateSceneData(const ScenetData& NewSceneData);
 		void CollectStaticMesh(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList);
 		void CreateStaticMeshObject(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList);
+		void CollectLightObject(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList);
+
+		void BuildTopAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList);
 		void Update();
 		void Draw(ID3D12GraphicsCommandList4* commandList);
 		// 是否临时使用的资源。
@@ -87,9 +96,10 @@
 			}
 		}
 
-		void CreateMeshBuffer(ID3D12Device5* InDevice);
-		void BuildBottomAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList);
-		void BuildTopAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList);
+		void CreateStaticMeshBuffer(ID3D12Device5* InDevice);
+		void CreateProceduralMeshBuffer(ID3D12Device5* InDevice);
+		void BuildStaticMeshAccelerationStructure(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList);
+		void BuildProceduralMeshAS(ID3D12Device5* device, ID3D12GraphicsCommandList4* CommandList);
 	};
 
 

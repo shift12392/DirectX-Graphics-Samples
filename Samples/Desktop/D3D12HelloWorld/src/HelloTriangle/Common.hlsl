@@ -8,11 +8,16 @@ struct HitInfo
   float4 colorAndDistance;
 };
 
-// Attributes output by the raytracing when hitting a surface,
-// here the barycentric coordinates
-struct Attributes
+
+struct Ray
 {
-  float2 bary;
+	float3 origin;
+	float3 direction;
+};
+
+struct HitLightAttributes
+{
+	float3 Normal;
 };
 
 struct Vertex
@@ -23,6 +28,13 @@ struct Vertex
 	float4 color : COLOR;
 	float2 uv1 : TEXCOORD0;
 	float2 uv2 : TEXCOORD1;
+};
+
+struct SphereLightData
+{
+	float3   m_worldPos;
+	float    m_radius;
+	float4   m_color;
 };
 
 cbuffer SceneData : register(b0)
@@ -38,3 +50,7 @@ cbuffer SceneData : register(b0)
 
 // Raytracing acceleration structure, accessed as a SRV
 RaytracingAccelerationStructure SceneBVH : register(t0);
+
+
+
+

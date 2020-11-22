@@ -47,7 +47,7 @@ struct ObjectData
 	DirectX::XMFLOAT4X4 m_localToWorld = MathHelper::Identity4x4();
 };
 
-class StaticMesh
+class StaticMesh : public NonCopyable
 {
 private:
 	std::vector<Vertex>       m_vertexs;
@@ -93,7 +93,7 @@ public:
 
 };
 
-class StaticMeshObject
+class StaticMeshObject : public NonCopyable
 {
 public:
 	std::shared_ptr<StaticMesh> m_mesh;

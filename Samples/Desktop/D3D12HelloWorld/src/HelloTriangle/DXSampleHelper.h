@@ -288,7 +288,7 @@ public:
 	{
 		assert(Num > 0);
 		m_num = Num;
-		m_elementSize = CalculateConstantBufferByteSize(sizeof(T));
+		m_elementSize = CalculateConstantBufferByteSize((UINT)sizeof(T));
 		m_bufferSize = Num * m_elementSize;
 		m_resource = CreateUploadBuffer(InDevice, m_bufferSize, D3D12_RESOURCE_STATE_GENERIC_READ);
 		ThrowIfFailed(m_resource->Map(0, nullptr, reinterpret_cast<void**>(&m_data)));
@@ -306,4 +306,17 @@ public:
 	inline UINT   GetElementSize() { return m_elementSize; }
 	inline D3D12_GPU_VIRTUAL_ADDRESS GetElementGpuVirtualAddress(UINT InElement) { return GetGpuVirtualAddress() + InElement * GetElementSize(); }
 };
+
+
+
+class NonCopyable
+{
+protected:
+	NonCopyable() {}
+	~NonCopyable() {}
+private:
+	NonCopyable(const NonCopyable& B);
+	NonCopyable& operator =(const NonCopyable& B);
+};
+
 
