@@ -15,6 +15,8 @@
 #include "nv_helpers_dx12/ShaderBindingTableGenerator.h"
 #include "Scene.h"
 
+#include "RaytracingHlslCompat.h"
+
 #include <dxcapi.h>
 
 using namespace DirectX;
@@ -43,13 +45,11 @@ public:
 		}
 	}
 	
+public:
+	static const wchar_t* s_missShaderName[RayType::ECount];
+
 private:
     static const UINT FrameCount = 2;
-
-	struct SceneData
-	{
-		DirectX::XMFLOAT4  m_ambientColor;
-	};
 
 	bool m_raster = true;
 	DXGI_FORMAT m_backBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;

@@ -17,6 +17,9 @@
 
 #include <dxgidebug.h>
 
+
+const wchar_t* D3D12HelloTriangle::s_missShaderName[] = {L"Miss_Radiance",L"Miss_Shadow" };
+
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) :
     DXSample(width, height, name),
     m_frameIndex(0),
@@ -139,10 +142,11 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// has to be done explicitly in the lines below. Note that a single library
 	// can contain an arbitrary number of symbols, whose semantic is given in HLSL
 	// using the [shader("xxx")] syntax
+
 	pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
-	pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
-	pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit_Triangle" });
-	pipeline.AddLibrary(m_LightLibrary.Get(), { SphereLightObject::s_ClosestName,SphereLightObject::s_IntersectionName });
+	pipeline.AddLibrary(m_missLibrary.Get(),  { s_missShaderName[RayType::ERadianceRay]/*, s_missShaderName[RayType::EShadowRay]*/ });
+	pipeline.AddLibrary(m_hitLibrary.Get(),   { StaticMeshObject::s_ClosestHit_Triangle });
+	pipeline.AddLibrary(m_LightLibrary.Get(), { SphereLightObject::s_ClosestHit_SphereLight,SphereLightObject::s_Intersection_SphereLight });
 
 	// To be used, each DX12 shader needs a root signature defining which
     // parameters and buffers will be accessed.
@@ -180,8 +184,10 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 
 	// Hit group for the triangles, with a shader simply interpolating vertex
 	// colors
-	pipeline.AddHitGroup(L"HitGroup_Triangle", L"ClosestHit_Triangle");
-	pipeline.AddHitGroup(SphereLightObject::s_HitGroupName, SphereLightObject::s_ClosestName, L"", SphereLightObject::s_IntersectionName,D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+	pipeline.AddHitGroup(StaticMeshObject::s_HitGroup_Triangle, StaticMeshObject::s_ClosestHit_Triangle);
+	//pipeline.AddHitGroup(StaticMeshObject::s_HitGroup_TriangleShadow,L"");
+	pipeline.AddHitGroup(SphereLightObject::s_HitGroup_SphereLight, SphereLightObject::s_ClosestHit_SphereLight, L"", SphereLightObject::s_Intersection_SphereLight,D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+	//pipeline.AddHitGroup(SphereLightObject::s_HitGroup_SphereLight_Shadow, L"");
 
 	// The following section associates the root signature to each shader. Note
 	// that we can explicitly show that some shaders share the same root signature
@@ -189,9 +195,9 @@ void D3D12HelloTriangle::CreateRaytracingPipeline()
 	// to as hit groups, meaning that the underlying intersection, any-hit and
 	// closest-hit shaders share the same root signature.
 	pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), { L"RayGen" });
-	pipeline.AddRootSignatureAssociation(m_missSignature.Get(), { L"Miss" });
-	pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), { L"HitGroup_Triangle" });
-	pipeline.AddRootSignatureAssociation(m_lightSignature.Get(), { SphereLightObject::s_HitGroupName });
+	pipeline.AddRootSignatureAssociation(m_missSignature.Get(),  { s_missShaderName[RayType::ERadianceRay] });
+	pipeline.AddRootSignatureAssociation(m_hitSignature.Get(),   { StaticMeshObject::s_HitGroup_Triangle });
+	pipeline.AddRootSignatureAssociation(m_lightSignature.Get(), { SphereLightObject::s_HitGroup_SphereLight });
 
 	pipeline.SetGlobalRootSignature(m_rtxGlobalRootSignature);                        
 
@@ -241,21 +247,26 @@ void D3D12HelloTriangle::CreateShaderBindingTable()
 
 	// The miss and hit shaders do not access any external resources: instead they
 	// communicate their results through the ray payload
-	m_sbtHelper.AddMissProgram(L"Miss", {});
+	m_sbtHelper.AddMissProgram(s_missShaderName[RayType::ERadianceRay], {});
+	//m_sbtHelper.AddMissProgram(s_missShaderName[RayType::EShadowRay], {});
 
 	// Adding the triangle hit shader
 	for (auto Ite = m_scene->m_staticMeshObjects.begin(); Ite != m_scene->m_staticMeshObjects.end(); ++Ite)
 	{
 		D3D12_GPU_VIRTUAL_ADDRESS IndexBufferAddress = m_scene->m_indexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInIndexBufferInBytes;
 		D3D12_GPU_VIRTUAL_ADDRESS VertexBufferAddress = m_scene->m_vertexBuffer->GetGPUVirtualAddress() + Ite->second->m_mesh->StartInVertexBufferInBytes;
-		m_sbtHelper.AddHitGroup(L"HitGroup_Triangle", { (void*)IndexBufferAddress,(void*)VertexBufferAddress });
+		m_sbtHelper.AddHitGroup(StaticMeshObject::s_HitGroup_Triangle, { (void*)IndexBufferAddress,(void*)VertexBufferAddress });
+
+		//m_sbtHelper.AddHitGroup(StaticMeshObject::s_HitGroup_TriangleShadow, std::vector<void*>());
 	}
 
 	// Ìí¼ÓÇòÐÎµÆ¹â hit shader
 	for (auto Ite = m_scene->m_sphereLightObjects.begin(); Ite != m_scene->m_sphereLightObjects.end(); ++Ite)
 	{
 		D3D12_GPU_VIRTUAL_ADDRESS LightDataAddress = m_scene->m_allSphereLightBuffer.GetElementGpuVirtualAddress(Ite->second->StartInAllSphereLightBuffer);
-		m_sbtHelper.AddHitGroup(SphereLightObject::s_HitGroupName, { (void*)LightDataAddress });
+		m_sbtHelper.AddHitGroup(SphereLightObject::s_HitGroup_SphereLight, { (void*)LightDataAddress });
+
+		//m_sbtHelper.AddHitGroup(SphereLightObject::s_HitGroup_SphereLight_Shadow, std::vector<void*>());
 	}
 
 	// Compute the size of the SBT given the number of shaders and their

@@ -105,12 +105,12 @@
 	{
 		//创建网格体
 		std::shared_ptr<StaticMesh> planeMesh(StaticMesh::MakePlane(L"StaticMesh_Plane", 100.0f, 100.0f));
-		std::shared_ptr<StaticMesh> planeMesh1(StaticMesh::MakePlane(L"StaticMesh_Plane1", 100.0f, 100.0f));
-		std::shared_ptr<StaticMesh> CubeMesh(StaticMesh::MakeCube(L"StaticMesh_Cube", 50.0f, 50.0f,50.0f));
+		//std::shared_ptr<StaticMesh> planeMesh1(StaticMesh::MakePlane(L"StaticMesh_Plane1", 100.0f, 100.0f));
+		std::shared_ptr<StaticMesh> CubeMesh(StaticMesh::MakeCube(L"StaticMesh_Cube", 100.0f, 100.0f,100.0f));
 		
 		m_staticMeshes.insert({ planeMesh->GetName(), planeMesh });
 		m_staticMeshes.insert({ CubeMesh->GetName(), CubeMesh });
-		m_staticMeshes.insert({ planeMesh1->GetName(), planeMesh1 });
+		//m_staticMeshes.insert({ planeMesh1->GetName(), planeMesh1 });
 
 		CalcAllMeshSize();
 
@@ -198,20 +198,27 @@
 	void Scene::CreateStaticMeshObject(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList)
 	{
 		//创建网格对象
+		std::shared_ptr<StaticMesh> planeMesh = m_staticMeshes[L"StaticMesh_Plane"];
+		//左边的平面
 		std::shared_ptr<StaticMeshObject> planeMeshObject(new StaticMeshObject(L"StaticMeshObject_Plane"));
-		planeMeshObject->SetStaticMesh(m_staticMeshes[L"StaticMesh_Plane"], this);
-		DirectX::XMMATRIX LocalToWorld = DirectX::XMMatrixTranslation(0.0f, -100.0f, 0.0f);
-		DirectX::XMStoreFloat4x4(&planeMeshObject->m_localToWorld, DirectX::XMMatrixTranspose(LocalToWorld));
+		planeMeshObject->SetStaticMesh(planeMesh, this);
+		DirectX::XMMATRIX LocalToWorld = DirectX::XMMatrixScaling(4.0f, 2.0f, 1.0f);
+	    LocalToWorld *= DirectX::XMMatrixTranslation(0.0f, -100.0f, 0.0f);
+		planeMeshObject->SetLocalToWorld(DirectX::XMMatrixTranspose(LocalToWorld));
 
+		//右边的平面
 		std::shared_ptr<StaticMeshObject> planeMeshObject1(new StaticMeshObject(L"StaticMeshObject_Plane1"));
-		planeMeshObject1->SetStaticMesh(m_staticMeshes[L"StaticMesh_Plane1"], this);
-		LocalToWorld = DirectX::XMMatrixTranslation(0.0f, 100.0f, 0.0f);
-		DirectX::XMStoreFloat4x4(&planeMeshObject1->m_localToWorld, DirectX::XMMatrixTranspose(LocalToWorld));
+		planeMeshObject1->SetStaticMesh(planeMesh, this);
+		LocalToWorld = DirectX::XMMatrixScaling(4.0f, 2.0f, 1.0f);
+		LocalToWorld *= DirectX::XMMatrixTranslation(0.0f, 100.0f, 0.0f);
+		planeMeshObject1->SetLocalToWorld(DirectX::XMMatrixTranspose(LocalToWorld));
 
+		//一个立方体
 		std::shared_ptr<StaticMeshObject> CubeMeshObject(new StaticMeshObject(L"StaticMeshObject_Cube"));
 		CubeMeshObject->SetStaticMesh(m_staticMeshes[L"StaticMesh_Cube"], this);
-		LocalToWorld = DirectX::XMMatrixTranslation(200.0f, 0.0f, 0.0f);
-		DirectX::XMStoreFloat4x4(&CubeMeshObject->m_localToWorld, DirectX::XMMatrixTranspose(LocalToWorld));
+		LocalToWorld = DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f);
+		LocalToWorld *= DirectX::XMMatrixTranslation(0.0f, 0.0f, 100.0f);
+		CubeMeshObject->SetLocalToWorld(DirectX::XMMatrixTranspose(LocalToWorld));
 
 		m_staticMeshObjects.insert({ planeMeshObject->GetName(), planeMeshObject });
 		m_staticMeshObjects.insert({ CubeMeshObject->GetName(),CubeMeshObject });
@@ -224,9 +231,7 @@
 		{
 			Ite->second->m_indexInObjectBuffer = i;
 
-			ObjectData NewData;
-			NewData.m_localToWorld = Ite->second->m_localToWorld;
-			m_allObjectBuffer.CopyDataToGPU(NewData, i);
+			m_allObjectBuffer.CopyDataToGPU(Ite->second->m_data, i);
 
 			++i;
 		}
@@ -273,10 +278,10 @@
 	void Scene::CollectLightObject(ID3D12Device5 * device, ID3D12GraphicsCommandList4 * commandList)
 	{
 		//球形灯光
-		std::shared_ptr<SphereLightObject> LightObject1 = std::make_shared<SphereLightObject>(L"SphereLight1", DirectX::XMFLOAT3(0, -100, 50), 10.0f);
+		std::shared_ptr<SphereLightObject> LightObject1 = std::make_shared<SphereLightObject>(L"SphereLight1", DirectX::XMFLOAT3(0, -100, 150), 10.0f);
 		
 
-		std::shared_ptr<SphereLightObject> LightObject2 = std::make_shared<SphereLightObject>(L"SphereLight2", DirectX::XMFLOAT3(0, 100, 50), 10.0f);
+		std::shared_ptr<SphereLightObject> LightObject2 = std::make_shared<SphereLightObject>(L"SphereLight2", DirectX::XMFLOAT3(0, 100, 150), 10.0f);
 		LightObject2->SetColor(DirectX::XMFLOAT4(1, 1, 0, 1));
 
 		m_sphereLightObjects.insert({ LightObject1->GetName(), LightObject1 });

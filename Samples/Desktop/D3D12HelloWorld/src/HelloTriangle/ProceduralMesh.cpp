@@ -4,9 +4,10 @@
 
 UINT ProceduralMesh::AABBSize = ROUND_UP(sizeof(D3D12_RAYTRACING_AABB), D3D12_RAYTRACING_AABB_BYTE_ALIGNMENT);
 
-std::wstring SphereLightObject::s_HitGroupName = L"HitGroup_SphereLight";
-std::wstring SphereLightObject::s_IntersectionName = L"Intersection_SphereLight";
-std::wstring SphereLightObject::s_ClosestName = L"ClosestHit_SphereLight";
+const wchar_t* SphereLightObject::s_HitGroup_SphereLight = L"HitGroup_SphereLight";
+const wchar_t* SphereLightObject::s_Intersection_SphereLight = L"Intersection_SphereLight";
+const wchar_t* SphereLightObject::s_ClosestHit_SphereLight = L"ClosestHit_SphereLight";
+const wchar_t* SphereLightObject::s_HitGroup_SphereLight_Shadow = L"HitGroup_SphereLight_Shadow";
 
 void ProceduralMesh::BuildAccelerationStructure(ID3D12Device5 * InDevice, ID3D12GraphicsCommandList4 * InCommandList, Microsoft::WRL::ComPtr<ID3D12Resource> AABBBuffer)
 {

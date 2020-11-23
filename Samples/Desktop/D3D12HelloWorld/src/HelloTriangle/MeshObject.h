@@ -4,6 +4,7 @@
 #include <vector>
 #include "Common/MathHelper.h"
 #include "DXSampleHelper.h"
+#include "RaytracingHlslCompat.h"
 
 struct Vertex
 {
@@ -41,11 +42,6 @@ struct Vertex
 
 };
 
-
-struct ObjectData
-{
-	DirectX::XMFLOAT4X4 m_localToWorld = MathHelper::Identity4x4();
-};
 
 class StaticMesh : public NonCopyable
 {
@@ -96,31 +92,51 @@ public:
 class StaticMeshObject : public NonCopyable
 {
 public:
+	static const wchar_t* s_HitGroup_Triangle;
+	static const wchar_t* s_ClosestHit_Triangle;
+	static const wchar_t* s_HitGroup_TriangleShadow;
+
 	std::shared_ptr<StaticMesh> m_mesh;
 	std::wstring m_name;
 
 	D3D12_VERTEX_BUFFER_VIEW  m_vertexView = {};
 	D3D12_INDEX_BUFFER_VIEW   m_indexView = {};
 
-	DirectX::XMFLOAT4X4 m_localToWorld = MathHelper::Identity4x4();
+	//DirectX::XMFLOAT4X4 m_localToWorld = MathHelper::Identity4x4();
 	UINT m_indexInObjectBuffer = 0;
+
+	ObjectData m_data;
+
 public:
 	StaticMeshObject()
 	{
-
+		m_data.m_localToWorld = MathHelper::Identity4x4();
+		m_data.albedo = DirectX::XMFLOAT4(1, 1, 1, 1);
+		m_data.reflectanceCoef = 0.25f;
+		m_data.diffuseCoef = 1.0f;
+		m_data.specularCoef = 0.4f;
+		m_data.specularPower = 50;
 	}
 	StaticMeshObject(const std::wstring &inName)
 		:m_name(inName)
 	{
 	}
-	void SetLocalToWorld(const DirectX::XMFLOAT4X4& LocalToWorld)
+	void SetLocalToWorld(DirectX::XMMATRIX LocalToWorld)
 	{
-		m_localToWorld = LocalToWorld;
+		DirectX::XMStoreFloat4x4(&m_data.m_localToWorld, LocalToWorld);
+	}
+	void SetStaticMesh(std::shared_ptr<StaticMesh> inStaticMesh,class Scene *InScene);
+	void SetName(const std::wstring& inName) { m_name = inName; }
+	void SetMatrial(const DirectX::XMFLOAT4 &InAlbedo, float InReflectanceCoef, float InDiffuseCoef, float InSpecularCoef = 0.7f, float InSpecularPower = 50.0f)
+	{
+		m_data.albedo = InAlbedo;
+		m_data.reflectanceCoef = InReflectanceCoef;
+		m_data.diffuseCoef = InDiffuseCoef;
+		m_data.specularCoef = InSpecularCoef;
+		m_data.specularPower = InSpecularPower;
 	}
 
-	void SetStaticMesh(std::shared_ptr<StaticMesh> inStaticMesh,class Scene *InScene);
 	std::shared_ptr<StaticMesh> GetStaticMesh() { return m_mesh; }
-	void SetName(const std::wstring& inName) { m_name = inName; }
 	std::wstring GetName() const {	return m_name; }
 	uint32_t GetVertexNum() const
 	{
@@ -141,7 +157,7 @@ public:
 
 	DirectX::XMFLOAT4X4 GetLocalToWorldTransform() const
 	{
-		return m_localToWorld;
+		return m_data.m_localToWorld;
 	}
 
 	void Draw(ID3D12GraphicsCommandList4* CommandList)

@@ -13,6 +13,10 @@ D3D12_INPUT_ELEMENT_DESC Vertex::InputElementDesc[6] =
 };
 
 
+const wchar_t* StaticMeshObject::s_HitGroup_Triangle = L"HitGroup_Triangle";
+const wchar_t* StaticMeshObject::s_ClosestHit_Triangle = L"ClosestHit_Triangle";
+const wchar_t* StaticMeshObject::s_HitGroup_TriangleShadow = L"HitGroup_TriangleShadow";
+
 
 void StaticMesh::BuildAccelerationStructure(ID3D12Device5 * InDevice, ID3D12GraphicsCommandList4 * InCommandList, ID3D12Resource* InVertexBuffer, ID3D12Resource* InIndexBuffer)
 {

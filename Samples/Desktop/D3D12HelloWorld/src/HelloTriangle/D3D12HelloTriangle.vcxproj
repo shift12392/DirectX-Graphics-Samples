@@ -122,6 +122,7 @@
     <ClInclude Include="Common\MathHelper.h" />
     <ClInclude Include="Common\UploadBuffer.h" />
     <ClInclude Include="DXRHelper.h" />
+    <ClInclude Include="HLSLCompat.h" />
     <ClInclude Include="MeshObject.h" />
     <ClInclude Include="nv_helpers_dx12\BottomLevelASGenerator.h" />
     <ClInclude Include="nv_helpers_dx12\RaytracingPipelineGenerator.h" />
@@ -129,6 +130,7 @@
     <ClInclude Include="nv_helpers_dx12\ShaderBindingTableGenerator.h" />
     <ClInclude Include="nv_helpers_dx12\TopLevelASGenerator.h" />
     <ClInclude Include="ProceduralMesh.h" />
+    <ClInclude Include="RaytracingHlslCompat.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="D3D12HelloTriangle.h" />

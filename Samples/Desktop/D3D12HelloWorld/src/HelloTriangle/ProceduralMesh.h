@@ -59,9 +59,10 @@ public:
 	}; 
 
 public:
-	static std::wstring s_HitGroupName;
-	static std::wstring s_IntersectionName;
-	static std::wstring s_ClosestName;
+	static const wchar_t* s_HitGroup_SphereLight;
+	static const wchar_t* s_Intersection_SphereLight;
+	static const wchar_t* s_ClosestHit_SphereLight;
+	static const wchar_t* s_HitGroup_SphereLight_Shadow;
 public:
 	std::shared_ptr<ProceduralMesh> m_mesh;
 	std::wstring m_name;

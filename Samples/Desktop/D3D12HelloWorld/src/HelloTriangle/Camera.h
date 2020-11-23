@@ -36,7 +36,7 @@
 			XMStoreFloat4x4(&(NewCamera->m_projection), Projection);
 
 			//设置相机位置和朝向
-			DirectX::XMVECTOR Pos = DirectX::XMVectorSet(-200.0f, 0.0f, 200.0f, 1.0f);
+			DirectX::XMVECTOR Pos = DirectX::XMVectorSet(-300.0f, 300.0f, 300.0f, 1.0f);
 			XMStoreFloat4(&NewCamera->m_pos, Pos);
 			DirectX::XMVECTOR Target = DirectX::XMVectorZero();
 			DirectX::XMVECTOR Up = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
